@@ -2,17 +2,19 @@
 
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-admin.initializeApp();
 
-exports.sendNotification = functions.firestore.document("notifications/{userLogin}/{notificationId}").onWrite(async (change, context) => {
+admin.initializeApp(functions.config().firebase);
+
+const db = admin.firestore();
+
+exports.sendNotification = functions.firestore.document("notifications/{userLogin}").onWrite(async (change, context) => {
   const userLogin = context.params.userLogin;
-  const notificationId = context.params.notificationId;
-
   console.log("Sending notification to user ", userLogin);
 
-  const getDeviceTokensPromise = admin.firestore().doc(`users/${userLogin}/notificationTokens`).once("value");
-  return getDeviceTokensPromise.then(result => {
-    const tokenId = result.val();
+  const userRef = db.collection("users").doc(userLogin);
+  userRef.get().then(doc => {
+    const data = doc.data();
+    const tokens = data["messageTokens"];
     const payload = {
       notification: {
         title: "DesireGallery",
@@ -20,19 +22,19 @@ exports.sendNotification = functions.firestore.document("notifications/{userLogi
         icon: "default"
       }
     };
-
-    return admin.messaging().sendToDevice(tokenId, payload).then(response => {
-      console.log("Notification has been sent");
-      return response;
-    });
-  }).catch(error => {
-    console.log(error);
+    for (let i = 0; i < tokens.length; i++) {
+      let token = tokens[i];
+      admin.messaging().sendToDevice(token, payload).then(response => {
+        console.log("Notification has been sent. Results:", response.results);
+        return response;
+      })
+        .catch(error => {
+          console.log(`Failed to send notification: ${error}`);
+        });
+    }
+    return 0;
   })
+    .catch(error => {
+      console.log(`An error occurred while getting user${userLogin}: ${error}`);
+    })
 });
-
-// // Create and Deploy Your First Cloud Functions
-// // https://firebase.google.com/docs/functions/write-firebase-functions
-//
-// exports.helloWorld = functions.https.onRequest((request, response) => {
-//  response.send("Hello from Firebase!");
-// });
