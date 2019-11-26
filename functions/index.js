@@ -24,6 +24,7 @@ exports.sendNotification = functions.firestore.document("notifications/{userLogi
     };
     for (let i = 0; i < tokens.length; i++) {
       let token = tokens[i];
+      console.log("Sending message to token", token);
       admin.messaging().sendToDevice(token, payload).then(response => {
         console.log("Notification has been sent. Results:", response.results);
         return response;
